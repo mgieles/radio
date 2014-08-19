@@ -6,7 +6,9 @@
 #include "radio.h"
 #define BUFFERSIZE 300
 #define LARGE_N 10000000
-#define M_PI 3.141592653589793
+#ifndef M_PI
+#define M_PI           3.14159265358979323846
+#endif
 
 
 /*************************************************/
@@ -14,19 +16,27 @@ void get_args(int argc, char** argv, INPUT *params)
 {
   // User defined parameters
   params->dt    = pow(2.0,-8.0);    
+  params->dtadj = pow(2.0,-8.0);
   params->tend  = 1;    
-  params->dtout = pow(2.0,-2.0);
-  params->dtadj = pow(2.0,-4.0);
-  params->tout  = params->dtout ; 
-  params->tadj  = params->dtadj ; 
+  params->dtout = pow(2.0,-1.0);
+
+
   for(int i = 1; i < argc; i++){
     if (argv[i][0] == '-'){
       switch (argv[i][1]){
       case 't': params->tend = atof(argv[++i]);
 	break;
+      case 'd': params->dt = pow(2.0,-atof(argv[++i]));
+	break;
+      case 'a': params->dtadj = pow(2.0,-atof(argv[++i]));
+	break;
       }
     }  
   }
+
+  params->tout  = params->dtout ; 
+  params->tadj  = params->dtadj ; 
+
 }
 
 /*************************************************/
@@ -54,7 +64,7 @@ void readdata(CLUSTER **cluster)
 
   (*cluster)->N = i;
   (*cluster)->t = 0.0;
-  fprintf(stderr, " N = %10d \n",i);
+  //  fprintf(stderr, " N = %10d \n",i);
   (*cluster)->stars = calloc((*cluster)->N, sizeof(*stars));
 
   // Copy data to cluster and convert to spherical coordinates
@@ -129,7 +139,7 @@ void adjust(CLUSTER *cluster)
     cluster->W += 0.5*cluster->stars[i].mass*cluster->stars[i].phi;
     cluster->K += 0.5*cluster->stars[i].mass*(vr2i + vt2i);
     cluster->J += cluster->stars[i].mass*cluster->stars[i].vt*cluster->stars[i].r;
-    cluster->stars[i].E = 0.5*(vr2 + vt2) + cluster->stars[i].phi;
+    cluster->stars[i].E = 0.5*(vr2i + vt2i) + cluster->stars[i].phi;
     cluster->stars[i].rp = cluster->stars[i].r;
     
     if (i>0)
@@ -144,7 +154,7 @@ void adjust(CLUSTER *cluster)
       cluster->rh = cluster->stars[i].r;
   }
 
-  fprintf(stderr, " t = %7.3f ;  M = %10.8f ;  K = %10.7f ;  W = %10.7f ;  E = %10.7f ;  J = %10.7f ; <vr2> = %10.7f ; <vt2> = %10.7f ; rh = %10.7f  \n",
+  fprintf(stderr, " t = %7.3f  M = %10.8f  K = %10.7f  W = %10.7f  E = %10.7f  J = %10.7f  <vr2> = %10.7f  <vt2> = %10.7f  rh = %10.7f  \n",
 	  cluster->t, cluster->M, cluster->K, cluster->W,  cluster->W+ cluster->K, cluster->J, vr2/(float)cluster->N, vt2/(float)cluster->N, cluster->rh);
 }
 
@@ -216,6 +226,7 @@ void integrate(CLUSTER *cluster, INPUT params)
       for (int i=0; i<cluster->N; ++i){
 	cluster->stars[i].r = r[i];
 	cluster->stars[i].vr = vr[i];
+	cluster->stars[i].vt = sqrt(J2[i])/r[i];
 	cluster->stars[i].rp =  rp[i];
 	cluster->stars[i].cmass = cm[i];
 	cluster->stars[i].J2 = J2[i];
@@ -248,7 +259,7 @@ void integrate(CLUSTER *cluster, INPUT params)
 void output(CLUSTER *cluster)
 {
   for (int i=0;i<cluster->N;i++){
-    printf("%10.3e %5d   %10.3e   %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e \n",
+    printf("%10.3e %7d %10.3e   %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e \n",
 	   cluster->t,                    // (1)
 	   cluster->stars[i].id,          // (2)
 	   cluster->stars[i].mass,        // (3)
@@ -260,8 +271,10 @@ void output(CLUSTER *cluster)
 	   cluster->stars[i].E,           // (9)
 	   cluster->stars[i].vt,          // (10)
 	   cluster->stars[i].dt,          // (11)
-	   cluster->stars[i].cmass);      // (12)
-    //	   (cluster->stars[i].E0 - cluster->stars[i].E)/cluster->stars[i].E,
+	   cluster->stars[i].cmass,       // (12)
+	   cluster->stars[i].E0,          // (13)
+	   //	   cluster->stars[i].E);          // (13)
+	   (cluster->stars[i].E - cluster->stars[i].E0)/cluster->stars[i].E0);    //  (14)
 
   }
 }
