@@ -7,7 +7,7 @@
 #define BUFFERSIZE 300
 #define LARGE_N 10000000
 #ifndef M_PI
-#define M_PI           3.14159265358979323846
+#define M_PI  3.14159265358979323846
 #endif
 
 
@@ -19,7 +19,6 @@ void get_args(int argc, char** argv, INPUT *params)
   params->dtadj = pow(2.0,-8.0);
   params->tend  = 1;    
   params->dtout = pow(2.0,-1.0);
-
 
   for(int i = 1; i < argc; i++){
     if (argv[i][0] == '-'){
@@ -43,9 +42,9 @@ void get_args(int argc, char** argv, INPUT *params)
 void readdata(CLUSTER **cluster)
 {
   STAR *stars = malloc(sizeof(STAR));
-  float** data = malloc(7 * sizeof(float*));      // allocate the rows
+  double** data = malloc(7 * sizeof(double*));      // allocate the rows
   for (int i = 0; i < 7; ++i)
-    data[i] = malloc(LARGE_N * sizeof(float));   // allocate the columns
+    data[i] = malloc(LARGE_N * sizeof(double));   // allocate the columns
   char *tmp;
   int i=0,k;
   char buffer[BUFFERSIZE];
@@ -64,13 +63,13 @@ void readdata(CLUSTER **cluster)
 
   (*cluster)->N = i;
   (*cluster)->t = 0.0;
-  //  fprintf(stderr, " N = %10d \n",i);
   (*cluster)->stars = calloc((*cluster)->N, sizeof(*stars));
 
   // Copy data to cluster and convert to spherical coordinates
   for (i=0; i<(*cluster)->N; i++)
     {
       (*cluster)->stars[i].mass = data[0][i];
+
       r2 = 0;
       v2 = 0;
       (*cluster)->stars[i].vr  = 0.0; 
@@ -114,7 +113,7 @@ void readdata(CLUSTER **cluster)
 /*************************************************/
 void adjust(CLUSTER *cluster)
 {
-  float vr2 = 0.0, vt2 = 0.0, vr2i, vt2i;
+  float mvr2 = 0.0, mvt2 = 0.0, vr2, vt2;
   sort(cluster);
   get_phi(cluster);
 
@@ -129,17 +128,17 @@ void adjust(CLUSTER *cluster)
   cluster->stars[0].cmass = cluster->stars[0].mass;
 
   for (int i=0; i<cluster->N; ++i){
-    vr2i = pow(cluster->stars[i].vr,2.0);
-    vt2i = pow(cluster->stars[i].vt,2.0);
+    vr2 = pow(cluster->stars[i].vr,2.0);
+    vt2 = pow(cluster->stars[i].vt,2.0);
 
-    vr2 += vr2i;
-    vt2 += vt2i;
+    mvr2 += vr2;
+    mvt2 += vt2;
 
     cluster->M += cluster->stars[i].mass;
     cluster->W += 0.5*cluster->stars[i].mass*cluster->stars[i].phi;
-    cluster->K += 0.5*cluster->stars[i].mass*(vr2i + vt2i);
+    cluster->K += 0.5*cluster->stars[i].mass*(vr2 + vt2);
     cluster->J += cluster->stars[i].mass*cluster->stars[i].vt*cluster->stars[i].r;
-    cluster->stars[i].E = 0.5*(vr2i + vt2i) + cluster->stars[i].phi;
+    cluster->stars[i].E = 0.5*(vr2 + vt2) + cluster->stars[i].phi;
     cluster->stars[i].rp = cluster->stars[i].r;
     
     if (i>0)
@@ -155,7 +154,7 @@ void adjust(CLUSTER *cluster)
   }
 
   fprintf(stderr, " t = %7.3f  M = %10.8f  K = %10.7f  W = %10.7f  E = %10.7f  J = %10.7f  <vr2> = %10.7f  <vt2> = %10.7f  rh = %10.7f  \n",
-	  cluster->t, cluster->M, cluster->K, cluster->W,  cluster->W+ cluster->K, cluster->J, vr2/(float)cluster->N, vt2/(float)cluster->N, cluster->rh);
+	  cluster->t, cluster->M, cluster->K, cluster->W,  cluster->W+ cluster->K, cluster->J, mvr2/(float)cluster->N, mvt2/(float)cluster->N, cluster->rh);
 }
 
 /*************************************************/
@@ -203,9 +202,10 @@ void get_phi(CLUSTER *cluster)
 /*************************************************/
 void integrate(CLUSTER *cluster, INPUT params)
 {
+  // Integrate cluster
   while (cluster->t < params.tend)
     {
-      //Action
+      // Copy data to arrays for (possible) use of GPU
       int N = (int)cluster->N;
       float *r = (float *)malloc(N*sizeof(float));
       float *vr = (float *)malloc(N*sizeof(float));
@@ -216,18 +216,20 @@ void integrate(CLUSTER *cluster, INPUT params)
       for (int i=0; i<cluster->N; ++i){
 	r[i] = (float)cluster->stars[i].r;
 	vr[i] = (float)cluster->stars[i].vr;
-	rp[i] = (float)cluster->stars[i].rp;
+	rp[i] = (float)cluster->stars[i].r;
 	cm[i] = (float)cluster->stars[i].cmass;
 	J2[i] = (float)cluster->stars[i].J2;
       }
       
-      rk4(r, vr, J2, rp, cm, N, params.dt); // On GPU
+      // Take RK4 step, can be on GPU
+      rk4(r, vr, J2, rp, cm, cluster->N, params.dt); 
 
+      // Copy data back to cluster
       for (int i=0; i<cluster->N; ++i){
 	cluster->stars[i].r = r[i];
 	cluster->stars[i].vr = vr[i];
 	cluster->stars[i].vt = sqrt(J2[i])/r[i];
-	cluster->stars[i].rp =  rp[i];
+	cluster->stars[i].rp =  r[i];
 	cluster->stars[i].cmass = cm[i];
 	cluster->stars[i].J2 = J2[i];
       }
@@ -259,23 +261,19 @@ void integrate(CLUSTER *cluster, INPUT params)
 void output(CLUSTER *cluster)
 {
   for (int i=0;i<cluster->N;i++){
-    printf("%10.3e %7d %10.3e   %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e \n",
+    printf("%10.3e %7d %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e \n",
 	   cluster->t,                    // (1)
 	   cluster->stars[i].id,          // (2)
 	   cluster->stars[i].mass,        // (3)
 	   cluster->stars[i].r,           // (4)
 	   cluster->stars[i].vr,          // (5)
-	   cluster->stars[i].phi,         // (6)
-	   cluster->stars[i].E,           // (7)
-	   cluster->stars[i].J2,          // (8)
-	   cluster->stars[i].E,           // (9)
-	   cluster->stars[i].vt,          // (10)
-	   cluster->stars[i].dt,          // (11)
-	   cluster->stars[i].cmass,       // (12)
-	   cluster->stars[i].E0,          // (13)
-	   //	   cluster->stars[i].E);          // (13)
-	   (cluster->stars[i].E - cluster->stars[i].E0)/cluster->stars[i].E0);    //  (14)
-
+	   cluster->stars[i].vt,          // (6)
+	   cluster->stars[i].phi,         // (7)
+	   cluster->stars[i].E,           // (8)
+	   cluster->stars[i].J2,          // (9)
+	   cluster->stars[i].cmass,       // (10)
+	   cluster->stars[i].E0,          // (11)
+	   (cluster->stars[i].E - cluster->stars[i].E0)/cluster->stars[i].E0);    //  (12)
   }
 }
 

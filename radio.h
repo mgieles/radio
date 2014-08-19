@@ -11,7 +11,7 @@ typedef struct star{
   int id;
   float mass;
   float cmass;
-  float  phi, dt;
+  float phi, dt;
   float r, vr, vt, E0, E, J2;
   float rp;
   float rnew;

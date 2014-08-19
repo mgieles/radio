@@ -63,6 +63,7 @@ float compute_acc(float r, float J2, float *rp, float *cm, int N)
 
   if (i>0)
     M = cm[i-1];
+
   float acc = -M/r2 + J2/(r*r2);
   return acc;
 }
