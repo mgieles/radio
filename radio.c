@@ -15,8 +15,8 @@
 void get_args(int argc, char** argv, INPUT *params)
 {
   // User defined parameters
-  params->dt    = pow(2.0,-8.0);    
-  params->dtadj = pow(2.0,-8.0);
+  params->dt    = pow(2.0,-9.0);    
+  params->dtadj = pow(2.0,-2.0);
   params->tend  = 1;    
   params->dtout = pow(2.0,-1.0);
 
