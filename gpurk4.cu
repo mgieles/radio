@@ -59,7 +59,6 @@ __global__ void gpu_rk4(float *r, float *vr, float *J2, float *rp, float *cm, in
       
       r[i] = r0  + dt*(kr[0] + 2.0*kr[1] + 2.0*kr[2] + kr[3])/6.0;
       vr[i] = v0 + dt*(kv[0] + 2.0*kv[1] + 2.0*kv[2] + kv[3])/6.0;
-      t += dt;
     }
 }
 
