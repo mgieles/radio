@@ -36,7 +36,7 @@ void integrate(CLUSTER *cluster, INPUT params);
 void sort(CLUSTER *cluster);
 void output(CLUSTER *cluster);
 void free_memory(CLUSTER *cluster);
-void rk4(float *r, float *vr, float *J2, float *rp, float *cm, int N, float dt); 
+void rk4(float *r, float *vr, float *J2, float *rp, float *cm, int N, float dt, float *dt_ind); 
 
 
 

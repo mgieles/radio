@@ -88,16 +88,17 @@ void readdata(CLUSTER **cluster)
 
   sort(*cluster);
   get_phi(*cluster);
+
   for (i=0; i<(*cluster)->N; i++){
     (*cluster)->stars[i].E0 += (*cluster)->stars[i].phi;
     (*cluster)->stars[i].E = (*cluster)->stars[i].E0;
     
-    float dt = (2.0*M_PI/pow(-2.0*(*cluster)->stars[i].E0,1.5))/256.;
-    float power = 8.0;      
-    while(power < 1.0/dt)
-      power*=2.0;
-    dt = 1.0/power;
-    (*cluster)->stars[i].dt = dt;
+    float dt = (2.0*M_PI/pow(-2.0*(*cluster)->stars[i].E0,1.5))/1024.0;
+    float dt_discrete = pow(2.0,-3.0);      
+    while(dt_discrete > dt)
+      dt_discrete /= 2.0;
+
+    (*cluster)->stars[i].dt = dt_discrete;
   }
 
   adjust(*cluster);
@@ -212,6 +213,7 @@ void integrate(CLUSTER *cluster, INPUT params)
       float *rp = (float *)malloc(N*sizeof(float));
       float *cm = (float *)malloc(N*sizeof(float));
       float *J2 = (float *)malloc(N*sizeof(float));
+      float *dt = (float *)malloc(N*sizeof(float));
       
       for (int i=0; i<cluster->N; ++i){
 	r[i] = (float)cluster->stars[i].r;
@@ -219,10 +221,11 @@ void integrate(CLUSTER *cluster, INPUT params)
 	rp[i] = (float)cluster->stars[i].r;
 	cm[i] = (float)cluster->stars[i].cmass;
 	J2[i] = (float)cluster->stars[i].J2;
+	dt[i] = (float)cluster->stars[i].dt;
       }
       
       // Take RK4 step, can be on GPU
-      rk4(r, vr, J2, rp, cm, cluster->N, params.dt); 
+      rk4(r, vr, J2, rp, cm, cluster->N, params.dt, dt); 
 
       // Copy data back to cluster
       for (int i=0; i<cluster->N; ++i){
@@ -239,6 +242,7 @@ void integrate(CLUSTER *cluster, INPUT params)
       free(rp);
       free(cm);
       free(J2);
+      free(dt);
       
       cluster->t += params.dt;
       
@@ -261,7 +265,7 @@ void integrate(CLUSTER *cluster, INPUT params)
 void output(CLUSTER *cluster)
 {
   for (int i=0;i<cluster->N;i++){
-    printf("%10.3e %7d %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e \n",
+    printf("%10.3e %7d %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e \n",
 	   cluster->t,                    // (1)
 	   cluster->stars[i].id,          // (2)
 	   cluster->stars[i].mass,        // (3)
@@ -273,7 +277,8 @@ void output(CLUSTER *cluster)
 	   cluster->stars[i].J2,          // (9)
 	   cluster->stars[i].cmass,       // (10)
 	   cluster->stars[i].E0,          // (11)
-	   (cluster->stars[i].E - cluster->stars[i].E0)/cluster->stars[i].E0);    //  (12)
+	   (cluster->stars[i].E - cluster->stars[i].E0)/cluster->stars[i].E0,    //  (12)
+	   cluster->stars[i].dt);         // (13)
   }
 }
 

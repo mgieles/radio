@@ -57,14 +57,13 @@ __global__ void gpu_rk4(float *r, float *vr, float *J2, float *rp, float *cm, in
       kr[3] = v0 + dt*kv[2];
       kv[3] = gpu_compute_acc(r1, J2[i], rp, cm, N);
       
-      
       r[i] = r0  + dt*(kr[0] + 2.0*kr[1] + 2.0*kr[2] + kr[3])/6.0;
       vr[i] = v0 + dt*(kv[0] + 2.0*kv[1] + 2.0*kv[2] + kv[3])/6.0;
-  }
-  
+      t += dt;
+    }
 }
 
-extern "C" void rk4(float *r, float *vr, float *J2,  float *rp, float *cm, int N, float dt)
+extern "C" void rk4(float *r, float *vr, float *J2,  float *rp, float *cm, int N, float dt, float *dt_ind)
 {
   float *r_d, *vr_d, *J2_d, *rp_d, *cm_d;
   
@@ -72,7 +71,7 @@ extern "C" void rk4(float *r, float *vr, float *J2,  float *rp, float *cm, int N
   cudaMalloc(&vr_d , sizeof(float)*N); 
   cudaMalloc(&J2_d , sizeof(float)*N); 
   cudaMalloc(&rp_d , sizeof(float)*N); 
-  cudaMalloc(&cm_d , sizeof(float)*N); 
+  cudaMalloc(&cm_d , sizeof(float)*N);  
   
   cudaMemcpy(r_d,  r , sizeof(float)*N, cudaMemcpyHostToDevice); // Host -> Device
   cudaMemcpy(vr_d, vr, sizeof(float)*N, cudaMemcpyHostToDevice); // Host -> Device
