@@ -39,10 +39,7 @@ void rk4(float *r, float *vr, float *J2, float *rp, float *cm,  int N, float dt,
 
 	  r[i] = r0  + dti*(kr[0] + 2.0*kr[1] + 2.0*kr[2] + kr[3])/6.0;
 	  vr[i] = v0 + dti*(kv[0] + 2.0*kv[1] + 2.0*kv[2] + kv[3])/6.0;
-	  //	  fprintf(stderr," tstep  = %5i %12.6f %12.6f %12.6f \n",i,t, dt, dt_ind[i]);
 	  t+=dti;
-
-	  //t+=dt;
 	}
     }
 }

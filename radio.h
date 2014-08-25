@@ -3,8 +3,14 @@ typedef struct input{
   float dt;
   float dtout;
   float dtadj;
+  float dtadjout;
+
   float tout;
   float tadj;
+  float tadjout;
+
+  double wtime0;
+  double wtime;
 }INPUT;
 
 typedef struct star{
@@ -27,13 +33,21 @@ typedef struct cluster{
 } CLUSTER;
 
 float myrand();
+
 void get_args(int argc, char* argv[], INPUT *params);
 void readdata(CLUSTER **cluster);
+
 void sort(CLUSTER *cluster);
-void adjust(CLUSTER *cluster);
-void get_phi(CLUSTER *cluster);
-void integrate(CLUSTER *cluster, INPUT params);
-void sort(CLUSTER *cluster);
+void sort_func(float *r, int *jlist, int N);
+
+void adjust(CLUSTER *cluster, INPUT *params);
+
+void getphi(CLUSTER *cluster);
+void getphi_func(float *r, float *m, float *phi, int N);
+
+double wtime();
+
+void integrate(CLUSTER *cluster, INPUT *params);
 void output(CLUSTER *cluster);
 void free_memory(CLUSTER *cluster);
 void rk4(float *r, float *vr, float *J2, float *rp, float *cm, int N, float dt, float *dt_ind); 

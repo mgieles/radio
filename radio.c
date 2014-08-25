@@ -1,5 +1,5 @@
 #include <sys/types.h>
-#include <time.h>
+#include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -15,10 +15,10 @@
 void get_args(int argc, char** argv, INPUT *params)
 {
   // User defined parameters
-  params->dt    = pow(2.0,-9.0);    
-  params->dtadj = pow(2.0,-2.0);
+  params->dt    = pow(2.0,-7.0);    
+  params->dtadj = pow(2.0,-7.0);
   params->tend  = 1;    
-  params->dtout = pow(2.0,-1.0);
+  params->dtout = pow(2.0,-3.0);
 
   for(int i = 1; i < argc; i++){
     if (argv[i][0] == '-'){
@@ -33,9 +33,10 @@ void get_args(int argc, char** argv, INPUT *params)
     }  
   }
 
-  params->tout  = params->dtout ; 
-  params->tadj  = params->dtadj ; 
-
+  params->tout     = params->dtout ; 
+  params->tadjout  = 0.0; //params->dtout ; 
+  params->tadj     = params->dtadj ; 
+  params->wtime0   = wtime();
 }
 
 /*************************************************/
@@ -86,10 +87,15 @@ void readdata(CLUSTER **cluster)
       
     }
 
+  for (i=0; i<(*cluster)->N; ++i){
+    (*cluster)->stars[i].id = i+1;
+  }
+
   sort(*cluster);
-  get_phi(*cluster);
+  getphi(*cluster);
 
   for (i=0; i<(*cluster)->N; i++){
+    fprintf(stdout, " TEST PHI = %10i %20.10f \n",i, (*cluster)->stars[i].phi);
     (*cluster)->stars[i].E0 += (*cluster)->stars[i].phi;
     (*cluster)->stars[i].E = (*cluster)->stars[i].E0;
     
@@ -98,25 +104,26 @@ void readdata(CLUSTER **cluster)
     while(dt_discrete > dt)
       dt_discrete /= 2.0;
 
-    (*cluster)->stars[i].dt = dt_discrete;
+    (*cluster)->stars[i].dt = pow(2.0, -7.0); //dt_discrete;
   }
 
-  adjust(*cluster);
-
-  for (i=0; i<(*cluster)->N; ++i)
+  for (i=0; i<(*cluster)->N; ++i){
     (*cluster)->stars[i].id = i+1;
+  }
 
-  output(*cluster);
-  free(data);
-  
+  free(data);  
 }
 
 /*************************************************/
-void adjust(CLUSTER *cluster)
+void adjust(CLUSTER *cluster, INPUT *params)
 {
   float mvr2 = 0.0, mvt2 = 0.0, vr2, vt2;
-  sort(cluster);
-  get_phi(cluster);
+
+  if (cluster->t > 0.0)
+    {
+      sort(cluster);
+      getphi(cluster);
+    }
 
   // Energy
   cluster->M = 0.0;
@@ -154,57 +161,79 @@ void adjust(CLUSTER *cluster)
       cluster->rh = cluster->stars[i].r;
   }
 
-  fprintf(stderr, " t = %7.3f  M = %10.8f  K = %10.7f  W = %10.7f  E = %10.7f  J = %10.7f  <vr2> = %10.7f  <vt2> = %10.7f  rh = %10.7f  \n",
-	  cluster->t, cluster->M, cluster->K, cluster->W,  cluster->W+ cluster->K, cluster->J, mvr2/(float)cluster->N, mvt2/(float)cluster->N, cluster->rh);
+  // Some global diagnostics to error stream
+  if (cluster->t >= params->tadjout){
+    fprintf(stderr, " t = %9.4f  M = %5.3f  K = %8.5f  W = %8.5f  E = %8.5f  J = %8.5f  <vr2> = %7.5f  <vt2> = %7.5f  rh = %6.3f  wtime = %9.3f sec \n",
+	    cluster->t, cluster->M, cluster->K, cluster->W,  cluster->W+ cluster->K, cluster->J, mvr2/(float)cluster->N, mvt2/(float)cluster->N, cluster->rh, wtime()-params->wtime0);
+    params->tadjout += params->dtout;
+  }
 }
 
 /*************************************************/
 void sort(CLUSTER *cluster)
 {
-  // (Shell) sort stars in order of increasing r
-  int n = cluster->N;
-  int i,j,inc; 
-  float v;
-  STAR vstar;
-  inc = 1;
+  // Sort stars in order of increasing r on CPU or GPU
 
-  do {
-    inc *= 3;
-    inc++;
-  } while (inc <= n); 
-  do {
-    inc /= 3;
-    for (i=inc; i<n; i++) {
-      v=cluster->stars[i].r;
-      vstar=cluster->stars[i];
-      j=i;
-      while (cluster->stars[j-inc].r > v) {
-	cluster->stars[j]=cluster->stars[j-inc];
-	j -= inc;
-	if (j < inc) break;
-      }
-      cluster->stars[j]=vstar; 
-    }
-  } while (inc >= 1);  
-}
+  CLUSTER *cl;
+  cl = malloc(sizeof(CLUSTER));
+  cl->stars = calloc(cluster->N, sizeof(STAR));
 
-/*************************************************/
-void get_phi(CLUSTER *cluster)
-{
+  // Copy data to arrays for (possible) use of GPU
+  int N = (int)cluster->N;
+  float *r = (float *)malloc(N*sizeof(float));
+  int *jlist = (int *)malloc(N*sizeof(int));
+
   for (int i=0; i<cluster->N; ++i){
-    cluster->stars[i].phi = 0.0;
-    for (int j=0; j<i; ++j)
-      cluster->stars[i].phi -= cluster->stars[j].mass/cluster->stars[i].r;
-    for (int j=i+1; j<cluster->N; ++j)
-      cluster->stars[i].phi -= cluster->stars[j].mass/cluster->stars[j].r;
+    cl->stars[i] = cluster->stars[i];
+    r[i] = (float)cluster->stars[i].r;
+    jlist[i] = i;
+  }
+
+  sort_func(r, jlist, N);
+
+  // Put the stars in correct order
+  for (int i=0; i<cluster->N; ++i){
+    cluster->stars[i] = cl->stars[jlist[i]];
   }
 }
 
+
 /*************************************************/
-void integrate(CLUSTER *cluster, INPUT params)
+void getphi(CLUSTER *cluster)
 {
+  // Compute potential on CPU or GPU
+  int N = (int)cluster->N;
+
+  float *r = (float *)malloc(N*sizeof(float));
+  float *m = (float *)malloc(N*sizeof(float));
+  float *phi = (float *)malloc(N*sizeof(float));
+
+  for (int i=0; i<cluster->N; ++i){
+    r[i] = (float)cluster->stars[i].r;
+    m[i] = (float)cluster->stars[i].mass;
+    phi[i] = 0.0;
+  }
+
+  getphi_func(r, m, phi, N);
+
+  for (int i=0; i<cluster->N; ++i){
+    cluster->stars[i].phi = phi[i];
+  }
+  free(r);
+  free(m);
+  free(phi);
+}
+
+
+/*************************************************/
+void integrate(CLUSTER *cluster, INPUT *params)
+{
+  // Output at t = 0;
+  adjust(cluster, params);
+  output(cluster);
+
   // Integrate cluster
-  while (cluster->t < params.tend)
+  while (cluster->t < params->tend)
     {
       // Copy data to arrays for (possible) use of GPU
       int N = (int)cluster->N;
@@ -225,18 +254,15 @@ void integrate(CLUSTER *cluster, INPUT params)
       }
       
       // Take RK4 step, can be on GPU
-      rk4(r, vr, J2, rp, cm, cluster->N, params.dt, dt); 
+      rk4(r, vr, J2, rp, cm, cluster->N, params->dt, dt); 
 
       // Copy data back to cluster
       for (int i=0; i<cluster->N; ++i){
 	cluster->stars[i].r = r[i];
 	cluster->stars[i].vr = vr[i];
 	cluster->stars[i].vt = sqrt(J2[i])/r[i];
-	cluster->stars[i].rp =  r[i];
-	cluster->stars[i].cmass = cm[i];
-	cluster->stars[i].J2 = J2[i];
       }
-
+      
       free(r);
       free(vr);
       free(rp);
@@ -244,20 +270,18 @@ void integrate(CLUSTER *cluster, INPUT params)
       free(J2);
       free(dt);
       
-      cluster->t += params.dt;
+      cluster->t += params->dt;
       
-      if (cluster->t >= params.tadj){
-	params.tadj += params.dtadj;
-	adjust(cluster);
+      if (cluster->t >= params->tadj){
+	params->tadj += params->dtadj;
+	adjust(cluster, params);
       }
       
-      if (cluster->t >= params.tout){
-	params.tout += params.dtout;
+      if (cluster->t >= params->tout){
+	params->tout += params->dtout;
 	output(cluster);
       }
     }
-
-  
 }
 
 
@@ -265,6 +289,7 @@ void integrate(CLUSTER *cluster, INPUT params)
 void output(CLUSTER *cluster)
 {
   for (int i=0;i<cluster->N;i++){
+    float dE = (cluster->stars[i].E - cluster->stars[i].E0)/cluster->stars[i].E0; 
     printf("%10.3e %7d %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e \n",
 	   cluster->t,                    // (1)
 	   cluster->stars[i].id,          // (2)
@@ -277,11 +302,10 @@ void output(CLUSTER *cluster)
 	   cluster->stars[i].J2,          // (9)
 	   cluster->stars[i].cmass,       // (10)
 	   cluster->stars[i].E0,          // (11)
-	   (cluster->stars[i].E - cluster->stars[i].E0)/cluster->stars[i].E0,    //  (12)
+	   dE,                            // (12)
 	   cluster->stars[i].dt);         // (13)
   }
 }
-
 
 /*************************************************/
 void free_memory(CLUSTER *cluster)
@@ -289,19 +313,24 @@ void free_memory(CLUSTER *cluster)
   free(cluster->stars);
   free(cluster);
 }
+
+/*************************************************/
+double wtime()
+{
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (double)((tv.tv_usec + (tv.tv_sec*1.0e6))/1.e6);
+}
+
 /*************************************************/
 int main(int argc, char** argv)
 {
   CLUSTER *cluster;
   INPUT params;
-
-  time_t t0, t1;
-  t0 = time(NULL);
+  
   get_args(argc, argv, &params);   
   readdata(&cluster);
-  integrate(cluster, params);
+  integrate(cluster, &params);
   free_memory(cluster);
-  t1 = time(NULL);
-  fprintf(stderr, " WALL TIME = %ld\n",(long)(t1-t0));
 }
 

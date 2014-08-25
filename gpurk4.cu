@@ -26,6 +26,7 @@ __global__ void gpu_rk4(float *r, float *vr, float *J2, float *rp, float *cm, in
 {
   float kr[4], kv[4];
   float r0, v0, r1;
+
   int i; 
 
   i = threadIdx.x + blockIdx.x*blockDim.x;
@@ -78,7 +79,7 @@ extern "C" void rk4(float *r, float *vr, float *J2,  float *rp, float *cm, int N
   cudaMemcpy(rp_d, rp, sizeof(float)*N, cudaMemcpyHostToDevice); // Host -> Device
   cudaMemcpy(cm_d, cm, sizeof(float)*N, cudaMemcpyHostToDevice); // Host -> Device
 
-  gpu_rk4 <<<256,BLOCKSIZE >>>(r_d, vr_d, J2_d, rp_d, cm_d, N, dt);
+  gpu_rk4 <<< 256, BLOCKSIZE >>>(r_d, vr_d, J2_d, rp_d, cm_d, N, dt);
 
   cudaMemcpy(r , r_d, sizeof(float)*N, cudaMemcpyDeviceToHost); // Device -> Host
   cudaMemcpy(vr, vr_d, sizeof(float)*N, cudaMemcpyDeviceToHost); // Device -> Host
