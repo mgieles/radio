@@ -29,6 +29,8 @@ void get_args(int argc, char** argv, INPUT *params)
 	break;
       case 'a': params->dtadj = pow(2.0,-atof(argv[++i]));
 	break;
+      case 'o': params->dtout = pow(2.0,-atof(argv[++i]));
+	break;
       }
     }  
   }
@@ -265,7 +267,6 @@ void integrate(CLUSTER *cluster, INPUT *params)
       free(rp);
       free(cm);
       free(J2);
-      free(dt);
       
       cluster->t += params->dt;
       
