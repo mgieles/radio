@@ -63,7 +63,7 @@ __global__ void gpu_rk4(float *r, float *vr, float *J2, float *rp, float *cm, in
     }
 }
 
-extern "C" void rk4(float *r, float *vr, float *J2,  float *rp, float *cm, int N, float dt, float *dt_ind)
+extern "C" void rk4(float *r, float *vr, float *J2,  float *rp, float *cm, int N, float dt)
 {
   float *r_d, *vr_d, *J2_d, *rp_d, *cm_d;
   

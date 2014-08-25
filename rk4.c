@@ -4,13 +4,12 @@
 
 float compute_acc(float r, float J2, float *rp, float *cm, int N);
 
-void rk4(float *r, float *vr, float *J2, float *rp, float *cm,  int N, float dt, float *dt_ind)
+void rk4(float *r, float *vr, float *J2, float *rp, float *cm,  int N, float dt)
 {
   float kr[4], kv[4];
   float r0, v0, r1;
   for (int i = 0; i<N; ++i)
     {
-      float dti = dt_ind[i];
       float t = 0;
       while (t < dt)
 	{
@@ -23,23 +22,23 @@ void rk4(float *r, float *vr, float *J2, float *rp, float *cm,  int N, float dt,
 	  kv[0] = compute_acc(r1, J2[i], rp, cm, N);
 
 	  /* Step 2 */
-	  r1 = r0 + 0.5*dti*kr[0];
-	  kr[1] = v0 + 0.5*dti*kv[0];
+	  r1 = r0 + 0.5*dt*kr[0];
+	  kr[1] = v0 + 0.5*dt*kv[0];
 	  kv[1] = compute_acc(r1, J2[i], rp, cm, N);
 	  
 	  /* Step 3 */
-	  r1 = r0 + 0.5*dti*kr[1];
-	  kr[2] = v0 + 0.5*dti*kv[1];
+	  r1 = r0 + 0.5*dt*kr[1];
+	  kr[2] = v0 + 0.5*dt*kv[1];
 	  kv[2] = compute_acc(r1, J2[i], rp, cm, N);
 	  
 	  /* Step 4 */
-	  r1 = r0 + dti*kr[2];
-	  kr[3] = v0 + dti*kv[2];
+	  r1 = r0 + dt*kr[2];
+	  kr[3] = v0 + dt*kv[2];
 	  kv[3] = compute_acc(r1, J2[i], rp, cm, N);
 
-	  r[i] = r0  + dti*(kr[0] + 2.0*kr[1] + 2.0*kr[2] + kr[3])/6.0;
-	  vr[i] = v0 + dti*(kv[0] + 2.0*kv[1] + 2.0*kv[2] + kv[3])/6.0;
-	  t+=dti;
+	  r[i] = r0  + dt*(kr[0] + 2.0*kr[1] + 2.0*kr[2] + kr[3])/6.0;
+	  vr[i] = v0 + dt*(kv[0] + 2.0*kv[1] + 2.0*kv[2] + kv[3])/6.0;
+	  t+=dt;
 	}
     }
 }

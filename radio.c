@@ -15,10 +15,10 @@
 void get_args(int argc, char** argv, INPUT *params)
 {
   // User defined parameters
-  params->dt    = pow(2.0,-7.0);    
-  params->dtadj = pow(2.0,-7.0);
-  params->tend  = 1;    
+  params->dt    = pow(2.0,-9.0);    
+  params->dtadj = pow(2.0,-9.0);
   params->dtout = pow(2.0,-3.0);
+  params->tend  = 1;    
 
   for(int i = 1; i < argc; i++){
     if (argv[i][0] == '-'){
@@ -32,9 +32,8 @@ void get_args(int argc, char** argv, INPUT *params)
       }
     }  
   }
-
   params->tout     = params->dtout ; 
-  params->tadjout  = 0.0; //params->dtout ; 
+  params->tadjout  = 0.0; 
   params->tadj     = params->dtadj ; 
   params->wtime0   = wtime();
 }
@@ -61,7 +60,6 @@ void readdata(CLUSTER **cluster)
 
   // Allocate memory for cluster and stars
   *cluster = malloc(sizeof(CLUSTER));
-
   (*cluster)->N = i;
   (*cluster)->t = 0.0;
   (*cluster)->stars = calloc((*cluster)->N, sizeof(*stars));
@@ -84,7 +82,6 @@ void readdata(CLUSTER **cluster)
       (*cluster)->stars[i].vt = sqrt(v2 - pow((*cluster)->stars[i].vr,2.0));
       (*cluster)->stars[i].J2 = pow((*cluster)->stars[i].r * (*cluster)->stars[i].vt, 2.0);    
       (*cluster)->stars[i].E0 = 0.5*v2; // Add potential later
-      
     }
 
   for (i=0; i<(*cluster)->N; ++i){
@@ -95,16 +92,18 @@ void readdata(CLUSTER **cluster)
   getphi(*cluster);
 
   for (i=0; i<(*cluster)->N; i++){
-    fprintf(stdout, " TEST PHI = %10i %20.10f \n",i, (*cluster)->stars[i].phi);
     (*cluster)->stars[i].E0 += (*cluster)->stars[i].phi;
     (*cluster)->stars[i].E = (*cluster)->stars[i].E0;
-    
-    float dt = (2.0*M_PI/pow(-2.0*(*cluster)->stars[i].E0,1.5))/1024.0;
-    float dt_discrete = pow(2.0,-3.0);      
-    while(dt_discrete > dt)
-      dt_discrete /= 2.0;
 
-    (*cluster)->stars[i].dt = pow(2.0, -7.0); //dt_discrete;
+    /*
+      Individual time step based on radial period: NOTE USED
+      float dt = (2.0*M_PI/pow(-2.0*(*cluster)->stars[i].E0,1.5))/1024.0;
+      float dt_discrete = pow(2.0,-3.0);      
+      while(dt_discrete > dt)
+      dt_discrete /= 2.0;
+      (*cluster)->stars[i].dt = pow(2.0, -7.0); //dt_discrete;
+    */
+
   }
 
   for (i=0; i<(*cluster)->N; ++i){
@@ -242,7 +241,6 @@ void integrate(CLUSTER *cluster, INPUT *params)
       float *rp = (float *)malloc(N*sizeof(float));
       float *cm = (float *)malloc(N*sizeof(float));
       float *J2 = (float *)malloc(N*sizeof(float));
-      float *dt = (float *)malloc(N*sizeof(float));
       
       for (int i=0; i<cluster->N; ++i){
 	r[i] = (float)cluster->stars[i].r;
@@ -250,11 +248,10 @@ void integrate(CLUSTER *cluster, INPUT *params)
 	rp[i] = (float)cluster->stars[i].r;
 	cm[i] = (float)cluster->stars[i].cmass;
 	J2[i] = (float)cluster->stars[i].J2;
-	dt[i] = (float)cluster->stars[i].dt;
       }
       
       // Take RK4 step, can be on GPU
-      rk4(r, vr, J2, rp, cm, cluster->N, params->dt, dt); 
+      rk4(r, vr, J2, rp, cm, cluster->N, params->dt); 
 
       // Copy data back to cluster
       for (int i=0; i<cluster->N; ++i){
