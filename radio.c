@@ -69,7 +69,7 @@ void readdata(CLUSTER **cluster)
   // Copy data to cluster and convert to spherical coordinates
   for (i=0; i<(*cluster)->N; i++)
     {
-      (*cluster)->stars[i].mass = data[0][i];
+      (*cluster)->stars[i].mass = 1.0/(float)(*cluster)->N;   //data[0][i];
 
       r2 = 0;
       v2 = 0;
@@ -275,7 +275,7 @@ void output(CLUSTER *cluster)
 {
   for (int i=0;i<cluster->N;i++){
     float dE = (cluster->stars[i].E - cluster->stars[i].E0)/cluster->stars[i].E0; 
-    printf("%10.3e %7d %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e \n",
+    printf("%10.3e %7d %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e \n",
 	   cluster->t,                    // (1)
 	   cluster->stars[i].id,          // (2)
 	   cluster->stars[i].mass,        // (3)
