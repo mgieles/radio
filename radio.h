@@ -1,6 +1,5 @@
 typedef struct input{
   float tend;
-  float dt;
   float dtout;
   float dtadj;
   float dtadjout;

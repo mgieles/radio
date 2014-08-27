@@ -15,8 +15,7 @@
 void get_args(int argc, char** argv, INPUT *params)
 {
   // User defined parameters
-  params->dt    = pow(2.0,-9.0);    
-  params->dtadj = pow(2.0,-9.0);
+  params->dtadj = pow(2.0,-7.0);
   params->dtout = pow(2.0,-3.0);
   params->tend  = 1;    
 
@@ -25,8 +24,6 @@ void get_args(int argc, char** argv, INPUT *params)
       switch (argv[i][1]){
       case 't': params->tend = atof(argv[++i]);
 	break;
-      case 'd': params->dt = pow(2.0,-atof(argv[++i]));
-	break;
       case 'a': params->dtadj = pow(2.0,-atof(argv[++i]));
 	break;
       case 'o': params->dtout = pow(2.0,-atof(argv[++i]));
@@ -34,6 +31,8 @@ void get_args(int argc, char** argv, INPUT *params)
       }
     }  
   }
+  if (params->dtout < params->dtadj) params->dtout = params->dtadj;
+
   params->dtint    = params->dtadj;
   params->tout     = params->dtout ; 
   params->tadjout  = 0.0; 
@@ -288,8 +287,7 @@ void output(CLUSTER *cluster)
 	   cluster->stars[i].J2,          // (9)
 	   cluster->stars[i].cmass,       // (10)
 	   cluster->stars[i].E0,          // (11)
-	   dE,                            // (12)
-	   cluster->stars[i].dt);         // (13)
+	   dE);                           // (12)
   }
 }
 
