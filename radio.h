@@ -4,7 +4,7 @@ typedef struct input{
   float dtout;
   float dtadj;
   float dtadjout;
-
+  float dtint;
   float tout;
   float tadj;
   float tadjout;
@@ -28,7 +28,7 @@ typedef struct cluster{
   float M, E, J, K, W;
   float t ;
   float rh;
-  float *rp;
+  float *rp;  
   STAR *stars;
 } CLUSTER;
 
@@ -45,12 +45,15 @@ void adjust(CLUSTER *cluster, INPUT *params);
 void getphi(CLUSTER *cluster);
 void getphi_func(float *r, float *m, float *phi, int N);
 
+
 double wtime();
+
+float timestep(CLUSTER *cluster, float);
 
 void integrate(CLUSTER *cluster, INPUT *params);
 void output(CLUSTER *cluster);
 void free_memory(CLUSTER *cluster);
-void rk4(float *r, float *vr, float *J2, float *rp, float *cm, int N, float dt); 
+void rk4(float *r, float *vr, float *J2, float *rp, float *cm, int N, float dt, float tend); 
 
 
 

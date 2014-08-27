@@ -34,6 +34,7 @@ void get_args(int argc, char** argv, INPUT *params)
       }
     }  
   }
+  params->dtint    = params->dtadj;
   params->tout     = params->dtout ; 
   params->tadjout  = 0.0; 
   params->tadj     = params->dtadj ; 
@@ -69,7 +70,7 @@ void readdata(CLUSTER **cluster)
   // Copy data to cluster and convert to spherical coordinates
   for (i=0; i<(*cluster)->N; i++)
     {
-      (*cluster)->stars[i].mass = 1.0/(double)(*cluster)->N; //data[0][i];
+      (*cluster)->stars[i].mass = data[0][i];
 
       r2 = 0;
       v2 = 0;
@@ -96,18 +97,8 @@ void readdata(CLUSTER **cluster)
   for (i=0; i<(*cluster)->N; i++){
     (*cluster)->stars[i].E0 += (*cluster)->stars[i].phi;
     (*cluster)->stars[i].E = (*cluster)->stars[i].E0;
-
-    /*
-      Individual time step based on radial period: NOTE USED
-      float dt = (2.0*M_PI/pow(-2.0*(*cluster)->stars[i].E0,1.5))/1024.0;
-      float dt_discrete = pow(2.0,-3.0);      
-      while(dt_discrete > dt)
-      dt_discrete /= 2.0;
-      (*cluster)->stars[i].dt = pow(2.0, -7.0); //dt_discrete;
-    */
-
   }
-
+  
   for (i=0; i<(*cluster)->N; ++i){
     (*cluster)->stars[i].id = i+1;
   }
@@ -164,8 +155,8 @@ void adjust(CLUSTER *cluster, INPUT *params)
 
   // Some global diagnostics to error stream
   if (cluster->t >= params->tadjout){
-    fprintf(stderr, " t = %9.4f  M = %5.3f  K = %11.8f  W = %11.8f  E = %11.8f  J = %8.5f  <vr2> = %7.5f  <vt2> = %7.5f  rh = %7.4f  wtime = %9.3f sec \n",
-	    cluster->t, cluster->M, cluster->K, cluster->W,  cluster->W+ cluster->K, cluster->J, mvr2/(float)cluster->N, mvt2/(float)cluster->N, cluster->rh, wtime()-params->wtime0);
+    fprintf(stderr, " t = %9.4f  M = %5.3f  K = %8.5f  W = %8.5f  E = %8.5f  J = %8.5f  <vr2> = %7.5f  <vt2> = %7.5f  rh = %6.3f  log_2(dt) = %4i  wtime = %9.3f sec \n",
+	    cluster->t, cluster->M, cluster->K, cluster->W,  cluster->W+ cluster->K, cluster->J, mvr2/(float)cluster->N, mvt2/(float)cluster->N, cluster->rh, (int)(log(params->dtint)/log(2.0)), wtime()-params->wtime0);
     params->tadjout += params->dtout;
   }
 }
@@ -253,8 +244,9 @@ void integrate(CLUSTER *cluster, INPUT *params)
       }
       
       // Take RK4 step, can be on GPU
-      rk4(r, vr, J2, rp, cm, cluster->N, params->dt); 
-
+      params->dtint = timestep(cluster, params->dtadj);
+      rk4(r, vr, J2, rp, cm, cluster->N, params->dtint, params->dtadj); 
+      
       // Copy data back to cluster
       for (int i=0; i<cluster->N; ++i){
 	cluster->stars[i].r = r[i];
@@ -268,12 +260,8 @@ void integrate(CLUSTER *cluster, INPUT *params)
       free(cm);
       free(J2);
       
-      cluster->t += params->dt;
-      
-      if (cluster->t >= params->tadj){
-	params->tadj += params->dtadj;
-	adjust(cluster, params);
-      }
+      cluster->t += params->dtadj;
+      adjust(cluster, params);
       
       if (cluster->t >= params->tout){
 	params->tout += params->dtout;
@@ -310,6 +298,22 @@ void free_memory(CLUSTER *cluster)
 {
   free(cluster->stars);
   free(cluster);
+}
+
+
+/*************************************************/
+float timestep(CLUSTER *cluster, float dtmax)
+{
+  float dtmin = dtmax;
+  for (int i=0; i< cluster->N; i++)
+    {
+      float dt = 0.4*fabs(cluster->stars[i].r / cluster->stars[i].vr);
+      float dt_discrete = dtmax;      
+      while(dt_discrete > dt)
+	dt_discrete /= 2.0;
+      if (dt_discrete < dtmin) dtmin = dt_discrete;
+    }
+  return dtmin;
 }
 
 /*************************************************/

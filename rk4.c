@@ -4,14 +4,14 @@
 
 float compute_acc(float r, float J2, float *rp, float *cm, int N);
 
-void rk4(float *r, float *vr, float *J2, float *rp, float *cm,  int N, float dt)
+void rk4(float *r, float *vr, float *J2, float *rp, float *cm,  int N, float dt, float tend)
 {
   float kr[4], kv[4];
   float r0, v0, r1;
   for (int i = 0; i<N; ++i)
     {
       float t = 0;
-      while (t < dt)
+      while (t < tend)
 	{
 	  r0 = r[i];
 	  v0 = vr[i];
