@@ -16,7 +16,7 @@ default:	$(OBJ) $(CPUOBJ)
 		$(CC) -o $(EXE) $(CPUOBJ) $(OBJ) $(LIBS) $(CFLAGS) 
 
 gpu:	$(OBJ)
-	$(NVCC) -c -m64 -arch=sm_35  $(CUDASOURCE) -Xcompiler "-g -pg"
+	$(NVCC) -c -m64 -arch=sm_13  $(CUDASOURCE) -Xcompiler "-g -pg"
 	$(CC)   -o $(EXE).gpu $(CUDAOBJ) $(OBJ) $(LIBS) $(CUDAFLAGS) 
 
 clean:	
