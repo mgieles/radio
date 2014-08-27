@@ -69,7 +69,7 @@ void readdata(CLUSTER **cluster)
   // Copy data to cluster and convert to spherical coordinates
   for (i=0; i<(*cluster)->N; i++)
     {
-      (*cluster)->stars[i].mass = data[0][i];
+      (*cluster)->stars[i].mass = 1.0/(double)(*cluster)->N; //data[0][i];
 
       r2 = 0;
       v2 = 0;
@@ -164,7 +164,7 @@ void adjust(CLUSTER *cluster, INPUT *params)
 
   // Some global diagnostics to error stream
   if (cluster->t >= params->tadjout){
-    fprintf(stderr, " t = %9.4f  M = %5.3f  K = %8.5f  W = %8.5f  E = %8.5f  J = %8.5f  <vr2> = %7.5f  <vt2> = %7.5f  rh = %6.3f  wtime = %9.3f sec \n",
+    fprintf(stderr, " t = %9.4f  M = %5.3f  K = %11.8f  W = %11.8f  E = %11.8f  J = %8.5f  <vr2> = %7.5f  <vt2> = %7.5f  rh = %7.4f  wtime = %9.3f sec \n",
 	    cluster->t, cluster->M, cluster->K, cluster->W,  cluster->W+ cluster->K, cluster->J, mvr2/(float)cluster->N, mvt2/(float)cluster->N, cluster->rh, wtime()-params->wtime0);
     params->tadjout += params->dtout;
   }
